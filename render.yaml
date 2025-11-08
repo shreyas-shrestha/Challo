@@ -2,7 +2,6 @@ services:
   - type: web
     name: vivi-api
     env: python
-    plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn backend.api:app --host 0.0.0.0 --port ${PORT}
     autoDeploy: true
@@ -17,7 +16,6 @@ services:
   - type: web
     name: vivi-web
     env: static
-    plan: starter
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
