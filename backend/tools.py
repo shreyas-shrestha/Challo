@@ -7,42 +7,65 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from functools import lru_cache
+from urllib.parse import quote_plus
 
 import httpx
+from supabase import Client  # type: ignore
+
 from backend.schemas import UserTaste
+from backend.supabase_client import safe_get_supabase_client
 
 logger = logging.getLogger(__name__)
 
 # === Data-access contracts Friend 2 will implement for real ===
+def _fetch_profile_from_supabase(user_id: str) -> Optional[Dict[str, Any]]:
+    client: Optional[Client] = safe_get_supabase_client()
+    if client is None:
+        logger.error("Supabase client unavailable when fetching user %s", user_id)
+        return None
+
+    try:
+        response = (
+            client.table("profiles")
+            .select(
+                "id, display_name, likes, vibes, tags, budget_max, distance_km_max"
+            )
+            .eq("id", user_id)
+            .single()
+            .execute()
+        )
+        return response.data
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.exception("Failed to fetch profile for user %s: %s", user_id, exc)
+        return None
+
+
 def tool_get_user_taste(user_id: str) -> UserTaste:
-    # TODO: replace with Supabase fetch
-    MOCK = {
-        "u1": UserTaste(
-            user_id="u1",
-            likes=["live music", "coffee tastings", "gallery pop-ups"],
-            vibes=["music", "creative", "social"],
-            budget_max=25,
-            distance_km_max=4,
-            tags=["indoor", "night"],
-        ),
-        "u2": UserTaste(
-            user_id="u2",
-            likes=["sunset walks", "outdoor markets", "kayaking"],
-            vibes=["outdoors", "adventure", "chill"],
-            budget_max=10,
-            distance_km_max=6,
-            tags=["free", "daytime"],
-        ),
-        "u3": UserTaste(
-            user_id="u3",
-            likes=["board games", "indie films", "tea houses"],
-            vibes=["quiet", "nerdy", "mindful"],
-            budget_max=15,
-            distance_km_max=3,
-            tags=["indoor", "cozy"],
-        ),
-    }
-    return MOCK.get(user_id, UserTaste(user_id=user_id))
+    record = _fetch_profile_from_supabase(user_id)
+
+    if not record:
+        logger.warning("No profile found for user %s; returning default preferences.", user_id)
+        return UserTaste(user_id=user_id)
+
+    likes = record.get("likes") or []
+    vibes = record.get("vibes") or []
+    tags = record.get("tags") or []
+
+    def _normalise_list(value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [str(v).strip() for v in value if v]
+        return [str(value).strip()]
+
+    return UserTaste(
+        user_id=str(record.get("id", user_id)),
+        likes=_normalise_list(likes),
+        vibes=_normalise_list(vibes),
+        tags=_normalise_list(tags),
+        budget_max=record.get("budget_max"),
+        distance_km_max=record.get("distance_km_max"),
+    )
 
 def tool_merge_tastes(tastes: List[UserTaste]) -> Dict[str, Any]:
     # naive weighted union for hackathon speed
@@ -412,44 +435,7 @@ def tool_find_activities(query: Dict[str, Any]) -> List[Dict[str, Any]]:
         key = f"{item.get('title','').lower()}::{item.get('address','').lower()}"
         combined_map[key] = item
 
-    combined = list(combined_map.values())
-    if combined:
-        return combined
-
-    if not os.getenv("GOOGLE_PLACES_API_KEY") and not os.getenv("EVENTBRITE_API_KEY"):
-        logger.info("No external API keys configured; returning cached demo data.")
-        return [
-            {
-                "title": "Sunset Kayak Meetup",
-                "vibe": "adventure",
-                "price": "$",
-                "address": "Charles River Canoe & Kayak, Cambridge",
-                "lat": 42.372,
-                "lng": -71.118,
-                "distance_km": 2.4,
-                "booking_url": "https://paddleboston.com/events",
-                "maps_url": "https://www.google.com/maps/search/?api=1&query=42.372,-71.118",
-                "summary": "Paddle the Charles at golden hour with local guides and sunset tunes.",
-                "source": "cached",
-                "tags": ["sunset", "outdoors", "group"],
-            },
-            {
-                "title": "Indie Film + Tea Night",
-                "vibe": "mindful",
-                "price": "$",
-                "address": "Somerville Theatre Microcinema",
-                "lat": 42.381,
-                "lng": -71.100,
-                "distance_km": 4.1,
-                "booking_url": "https://somervilletheatre.com",
-                "maps_url": "https://www.google.com/maps/search/?api=1&query=42.381,-71.100",
-                "summary": "Cozy screening of indie shorts followed by tea tasting in the lobby.",
-                "source": "cached",
-                "tags": ["indie", "indoor", "cozy"],
-            },
-        ]
-
-    return []
+    return list(combined_map.values())
 
 # === Inspired extensions (stubs for agentic flow) ===
 
