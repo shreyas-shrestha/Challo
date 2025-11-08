@@ -295,7 +295,8 @@ def _fetch_eventbrite_events(query: Dict[str, Any]) -> List[Dict[str, Any]]:
         params["location.latitude"] = coords[0]
         params["location.longitude"] = coords[1]
         radius_km = query.get("distance_cap") or 10
-        params["location.within"] = f"{max(1, min(int(radius_km), 50))}km"
+        radius_mi = max(1, min(int(round((radius_km or 0) * 0.621371)), 50))
+        params["location.within"] = f"{radius_mi}mi"
     elif query.get("location"):
         params["location.address"] = query["location"]
 
