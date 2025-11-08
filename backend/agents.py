@@ -84,9 +84,11 @@ class PlannerAgent:
         if tags_extra:
             merged["tags"] = list({*merged.get("tags", []), *tags_extra})
         # prefer explicit vibe hint, else listener’s top vibe if present; else merged heuristic
+        listener_vibes = listener_out.get("primary_vibes") or []
+        merged_vibe_default = merged.get("merged_vibe")
         merged["vibe"] = (
             overrides.get("vibe_hint")
-            or (listener_out.get("primary_vibes") or [merged.get("merged_vibe", "chill")])[0]
+            or (listener_vibes[0] if listener_vibes else merged_vibe_default)
         )
         merged["energy_level"] = listener_out.get("energy_level", "medium")
         # 3) search activities
@@ -101,7 +103,9 @@ class WriterAgent:
         for r in planner_out["raw_candidates"]:
             # basic scoring
             score = 0.4
-            if r.get("vibe") == merged.get("vibe"):
+            candidate_vibe = str(r.get("vibe") or merged.get("vibe") or "").lower()
+            merged_vibe = str(merged.get("vibe") or "").lower()
+            if candidate_vibe and merged_vibe and candidate_vibe == merged_vibe:
                 score += 0.3
 
             price = str(r.get("price", "")).lower()
@@ -118,13 +122,15 @@ class WriterAgent:
                 subtitle=None,
                 time=merged.get("time_window"),
                 price=r.get("price"),
-                vibe=merged.get("vibe", "chill"),
+                vibe=r.get("vibe") or merged.get("vibe"),
                 energy=merged.get("energy_level"),
                 address=r.get("address"),
                 lat=r.get("lat"),
                 lng=r.get("lng"),
                 distance_km=r.get("distance_km"),
                 booking_url=r.get("booking_url"),
+                maps_url=r.get("maps_url"),
+                summary=r.get("summary"),
                 group_score=min(score, 1.0),
                 reasons=[
                     f"Matches vibe: {merged.get('vibe')}",

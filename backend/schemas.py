@@ -1,27 +1,11 @@
-from typing import List, Optional, Literal
+from typing import List, Optional
 from pydantic import BaseModel, Field
-
-Vibe = Literal[
-    "chill",
-    "outdoors",
-    "social",
-    "artsy",
-    "nerdy",
-    "romantic",
-    "active",
-    "quiet",
-    "creative",
-    "music",
-    "adventure",
-    "mindful",
-    "party",
-]
 
 class UserTaste(BaseModel):
     user_id: str
     likes: List[str] = []
     dislikes: List[str] = []
-    vibes: List[Vibe] = []
+    vibes: List[str] = []
     budget_max: Optional[float] = None
     distance_km_max: Optional[float] = None
     tags: List[str] = []
@@ -42,20 +26,22 @@ class PlanCard(BaseModel):
     subtitle: Optional[str] = None
     time: Optional[str] = None
     price: Optional[str] = None
-    vibe: Vibe
+    vibe: Optional[str] = None
     energy: Optional[str] = None
     address: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
     distance_km: Optional[float] = None
     booking_url: Optional[str] = None
+    maps_url: Optional[str] = None
+    summary: Optional[str] = None
     group_score: float
     reasons: List[str]
     source: str
 
 class PlanResponse(BaseModel):
     query_normalized: str
-    merged_vibe: Vibe
+    merged_vibe: Optional[str] = None
     energy_profile: Optional[str] = None
     candidates: List[PlanCard]
     action_log: List[str]

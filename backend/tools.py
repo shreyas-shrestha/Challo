@@ -3,12 +3,15 @@
 
 import os
 import re
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from functools import lru_cache
 
 import httpx
 from backend.schemas import UserTaste
+
+logger = logging.getLogger(__name__)
 
 # === Data-access contracts Friend 2 will implement for real ===
 def tool_get_user_taste(user_id: str) -> UserTaste:
@@ -112,11 +115,15 @@ def _geocode_location(location: Optional[str]) -> Optional[Tuple[float, float]]:
             params={"address": location, "key": api_key},
             timeout=10.0,
         )
+        resp.raise_for_status()
         data = resp.json()
         if data.get("results"):
             geometry = data["results"][0]["geometry"]["location"]
             return geometry["lat"], geometry["lng"]
-    except Exception:
+        if data.get("status") != "OK":
+            logger.warning("Geocode lookup returned status %s", data.get("status"))
+    except Exception as exc:
+        logger.error("Geocode lookup failed: %s", exc)
         return None
 
     return None
@@ -204,6 +211,7 @@ def _fetch_google_places(query: Dict[str, Any]) -> List[Dict[str, Any]]:
                     "radius": radius_m,
                     "keyword": keyword,
                     "key": api_key,
+                    "language": "en",
                 }
                 if query.get("time_window"):
                     params["opennow"] = "true"
@@ -218,10 +226,17 @@ def _fetch_google_places(query: Dict[str, Any]) -> List[Dict[str, Any]]:
                         "query": f"{keyword} {query.get('location') or ''}".strip(),
                         "radius": radius_m,
                         "key": api_key,
+                        "language": "en",
+                        "region": "us",
                     },
                 )
+            resp.raise_for_status()
             data = resp.json()
-    except Exception:
+            status = data.get("status")
+            if status not in {"OK", "ZERO_RESULTS"}:
+                logger.warning("Google Places returned status %s: %s", status, data.get("error_message"))
+    except Exception as exc:
+        logger.error("Google Places fetch failed: %s", exc)
         return []
 
     for place in data.get("results", [])[:20]:
@@ -236,7 +251,7 @@ def _fetch_google_places(query: Dict[str, Any]) -> List[Dict[str, Any]]:
         results.append(
             {
                 "title": place.get("name"),
-                "vibe": query.get("vibe", "social"),
+                "vibe": query.get("vibe") or (place.get("types") or [None])[0],
                 "price": price_band,
                 "address": place.get("vicinity") or place.get("formatted_address"),
                 "lat": geometry.get("lat"),
@@ -244,8 +259,12 @@ def _fetch_google_places(query: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "distance_km": None,
                 "booking_url": place.get("website")
                 or f"https://maps.google.com/?q={place.get('place_id')}",
+                "maps_url": f"https://www.google.com/maps/search/?api=1&query={geometry.get('lat')},{geometry.get('lng')}",
                 "source": "google_places",
                 "tags": place.get("types") or [],
+                "summary": place.get("editorial_summary", {}).get("overview")
+                or place.get("business_status")
+                or f"Discover {place.get('name')} via Google Places.",
             }
         )
     return results
@@ -266,11 +285,10 @@ def _fetch_eventbrite_events(query: Dict[str, Any]) -> List[Dict[str, Any]]:
     search_terms.extend(query.get("tags") or [])
 
     params: Dict[str, Any] = {
-        "token": token,
-        "expand": "venue,category,subcategory",
+        "expand": "venue,category,subcategory,format",
         "q": " ".join(t for t in search_terms if t).strip() or "activities",
         "sort_by": "date",
-        "page_size": 20,
+        "page_size": 25,
     }
 
     if coords:
@@ -297,10 +315,15 @@ def _fetch_eventbrite_events(query: Dict[str, Any]) -> List[Dict[str, Any]]:
         resp = httpx.get(
             "https://www.eventbriteapi.com/v3/events/search/",
             params=params,
+            headers={"Authorization": f"Bearer {token}"},
             timeout=10.0,
         )
+        resp.raise_for_status()
         data = resp.json()
-    except Exception:
+        if data.get("error_description"):
+            logger.warning("Eventbrite error: %s", data["error_description"])
+    except Exception as exc:
+        logger.error("Eventbrite fetch failed: %s", exc)
         return []
 
     events: List[Dict[str, Any]] = []
@@ -311,7 +334,7 @@ def _fetch_eventbrite_events(query: Dict[str, Any]) -> List[Dict[str, Any]]:
         events.append(
             {
                 "title": event.get("name", {}).get("text"),
-                "vibe": query.get("vibe", "social"),
+                "vibe": query.get("vibe") or (category.get("short_name") if category else None),
                 "price": "free" if is_free else "$$",
                 "address": venue.get("address", {}).get("localized_address_display"),
                 "lat": venue.get("latitude"),
@@ -320,6 +343,12 @@ def _fetch_eventbrite_events(query: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "booking_url": event.get("url"),
                 "source": "eventbrite",
                 "tags": [category.get("short_name")] if category else [],
+                "summary": event.get("summary") or event.get("description", {}).get("text"),
+                "maps_url": (
+                    f"https://www.google.com/maps/search/?api=1&query={venue.get('latitude')},{venue.get('longitude')}"
+                    if venue.get("latitude") and venue.get("longitude")
+                    else None
+                ),
             }
         )
     return events
@@ -336,73 +365,49 @@ def tool_find_activities(query: Dict[str, Any]) -> List[Dict[str, Any]]:
     google_results = _fetch_google_places(query)
     event_results = _fetch_eventbrite_events(query)
 
-    combined = google_results + event_results
+    combined_map: Dict[str, Dict[str, Any]] = {}
+    for item in google_results + event_results:
+        key = f"{item.get('title','').lower()}::{item.get('address','').lower()}"
+        combined_map[key] = item
+
+    combined = list(combined_map.values())
     if combined:
         return combined
 
-    # Fallback cached data for demo mode.
-    return [
-        {
-            "title": "Sunset Kayak Meetup",
-            "vibe": "adventure",
-            "price": "$",
-            "address": "Charles River Canoe & Kayak, Cambridge",
-            "lat": 42.372,
-            "lng": -71.118,
-            "distance_km": 2.4,
-            "booking_url": "https://paddleboston.com/events",
-            "source": "cached",
-            "tags": ["sunset", "outdoors", "group"],
-        },
-        {
-            "title": "Indie Film + Tea Night",
-            "vibe": "mindful",
-            "price": "$",
-            "address": "Somerville Theatre Microcinema",
-            "lat": 42.381,
-            "lng": -71.100,
-            "distance_km": 4.1,
-            "booking_url": "https://somervilletheatre.com",
-            "source": "cached",
-            "tags": ["indie", "indoor", "cozy"],
-        },
-        {
-            "title": "Riverside Jazz Picnic",
-            "vibe": "music",
-            "price": "free",
-            "address": "Memorial Drive Riverbend Park",
-            "lat": 42.366,
-            "lng": -71.114,
-            "distance_km": 1.9,
-            "booking_url": "https://www.cambridgema.gov",
-            "source": "cached",
-            "tags": ["live music", "outdoors", "picnic"],
-        },
-        {
-            "title": "Maker's Market Crawl",
-            "vibe": "creative",
-            "price": "free",
-            "address": "Bow Market, Somerville",
-            "lat": 42.382,
-            "lng": -71.099,
-            "distance_km": 3.6,
-            "booking_url": "https://www.bowmarketsomerville.com",
-            "source": "cached",
-            "tags": ["market", "art", "local"],
-        },
-        {
-            "title": "Dance-In-The-Dark Silent Disco",
-            "vibe": "party",
-            "price": "$$",
-            "address": "Underground at Ink Block, Boston",
-            "lat": 42.347,
-            "lng": -71.060,
-            "distance_km": 5.2,
-            "booking_url": "https://www.eventbrite.com/o/silent-disco-boston-123456789",
-            "source": "cached",
-            "tags": ["night", "dance", "social"],
-        },
-    ]
+    if not os.getenv("GOOGLE_PLACES_API_KEY") and not os.getenv("EVENTBRITE_API_KEY"):
+        logger.info("No external API keys configured; returning cached demo data.")
+        return [
+            {
+                "title": "Sunset Kayak Meetup",
+                "vibe": "adventure",
+                "price": "$",
+                "address": "Charles River Canoe & Kayak, Cambridge",
+                "lat": 42.372,
+                "lng": -71.118,
+                "distance_km": 2.4,
+                "booking_url": "https://paddleboston.com/events",
+                "maps_url": "https://www.google.com/maps/search/?api=1&query=42.372,-71.118",
+                "summary": "Paddle the Charles at golden hour with local guides and sunset tunes.",
+                "source": "cached",
+                "tags": ["sunset", "outdoors", "group"],
+            },
+            {
+                "title": "Indie Film + Tea Night",
+                "vibe": "mindful",
+                "price": "$",
+                "address": "Somerville Theatre Microcinema",
+                "lat": 42.381,
+                "lng": -71.100,
+                "distance_km": 4.1,
+                "booking_url": "https://somervilletheatre.com",
+                "maps_url": "https://www.google.com/maps/search/?api=1&query=42.381,-71.100",
+                "summary": "Cozy screening of indie shorts followed by tea tasting in the lobby.",
+                "source": "cached",
+                "tags": ["indie", "indoor", "cozy"],
+            },
+        ]
+
+    return []
 
 # === Inspired extensions (stubs for agentic flow) ===
 

@@ -33,7 +33,7 @@ Environment variables (backend):
 - `GEMINI_API_KEY` *(optional)* — enables Google Gemini for the listener/writer agents. Without it, the service falls back to deterministic mocks.
 - `GEMINI_MODEL` *(optional, default `gemini-1.5-flash`)* — override the Gemini model.
 - `GOOGLE_PLACES_API_KEY` — required for live place discovery and geocoding via Google Places.
-- `EVENTBRITE_API_KEY` — required for live event discovery via the Eventbrite API.
+- `EVENTBRITE_API_KEY` — required for live event discovery via the Eventbrite API (bearer token).
 - `USE_AGENTIC` *(optional)* — set to `1` to enable the iterative controller workflow.
 
 **Request payload fields**
@@ -67,6 +67,8 @@ curl -X POST http://localhost:8000/api/v1/plan \
         "custom_tags": ["live music", "outdoor"]
       }'
 ```
+
+> If either API key is missing, the backend falls back to a tiny Cambridge demo set so you can still exercise the flow locally. For production, set both keys to see live Eventbrite + Google Places results.
 
 ### 2. Frontend (React)
 

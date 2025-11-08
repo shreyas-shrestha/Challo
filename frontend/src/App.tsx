@@ -1,33 +1,20 @@
 import { FormEvent, useMemo, useState } from "react";
 import { fetchPlan } from "./lib/api";
 
-type Vibe =
-  | "chill"
-  | "outdoors"
-  | "social"
-  | "artsy"
-  | "nerdy"
-  | "romantic"
-  | "active"
-  | "quiet"
-  | "creative"
-  | "music"
-  | "adventure"
-  | "mindful"
-  | "party";
-
 type PlanCard = {
   title: string;
   subtitle?: string | null;
   time?: string | null;
   price?: string | null;
-  vibe: Vibe;
+  vibe?: string | null;
   energy?: string | null;
   address?: string | null;
   lat?: number | null;
   lng?: number | null;
   distance_km?: number | null;
   booking_url?: string | null;
+  maps_url?: string | null;
+  summary?: string | null;
   group_score: number;
   reasons: string[];
   source: string;
@@ -35,7 +22,7 @@ type PlanCard = {
 
 type PlanResponse = {
   query_normalized: string;
-  merged_vibe: Vibe;
+  merged_vibe?: string | null;
   energy_profile?: string | null;
   candidates: PlanCard[];
   action_log: string[];
@@ -73,8 +60,8 @@ export default function App() {
     tags: string[];
   } | null>(null);
 
-  const vibePalette: Record<Vibe, string> = useMemo(
-    () => ({
+  const vibePalette = useMemo(() => {
+    return {
       chill: "#b5c0d0",
       outdoors: "#6fc495",
       social: "#f6ad55",
@@ -88,9 +75,9 @@ export default function App() {
       adventure: "#68d391",
       mindful: "#9ae6b4",
       party: "#f56565",
-    }),
-    []
-  );
+      sports: "#60a5fa",
+    } as Record<string, string>;
+  }, []);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -300,15 +287,21 @@ export default function App() {
               <div className="summary">
                 <div>
                   <h2>Top Picks for “{result.query_normalized}”</h2>
-                  <p>
-                    Shared vibe: <span className="badge">{result.merged_vibe}</span>{" "}
-                    {result.energy_profile && (
-                      <>
-                        · Energy:{" "}
-                        <span className="badge badge--muted">{result.energy_profile}</span>
-                      </>
-                    )}
-                  </p>
+                  {(result.merged_vibe || result.energy_profile) && (
+                    <p>
+                      {result.merged_vibe && (
+                        <>
+                          Shared vibe: <span className="badge">{result.merged_vibe}</span>{" "}
+                        </>
+                      )}
+                      {result.energy_profile && (
+                        <>
+                          Energy:{" "}
+                          <span className="badge badge--muted">{result.energy_profile}</span>
+                        </>
+                      )}
+                    </p>
+                  )}
                 </div>
                 <div className="log">
                   {result.action_log.map((entry, idx) => (
@@ -316,6 +309,15 @@ export default function App() {
                   ))}
                 </div>
               </div>
+              {result.candidates.length === 0 && (
+                <div className="empty-state">
+                  <h3>No live matches yet</h3>
+                  <p>
+                    Vivi called Google Places and Eventbrite but they didn't return any hits for the
+                    current settings. Try widening the distance, budget, or tweak the vibe keywords.
+                  </p>
+                </div>
+              )}
               {lastContext && (
                 <div className="constraints-card">
                   <h3>Planner inputs</h3>
@@ -358,13 +360,21 @@ export default function App() {
                 {result.candidates.map((card) => (
                   <article key={card.title} className="plan-card">
                     <header>
-                      <h3>{card.title}</h3>
-                      <span
-                        className="vibe-pill"
-                        style={{ backgroundColor: vibePalette[card.vibe] ?? "#CBD5F5" }}
-                      >
-                        {card.vibe}
-                      </span>
+                      <div>
+                        <h3>{card.title}</h3>
+                        {card.address && <p className="address">{card.address}</p>}
+                      </div>
+                      {card.vibe && (
+                        <span
+                          className="vibe-pill"
+                          style={{
+                            backgroundColor:
+                              vibePalette[card.vibe.toLowerCase()] ?? "#CBD5F5",
+                          }}
+                        >
+                          {card.vibe}
+                        </span>
+                      )}
                     </header>
                     <p className="meta">
                       {card.price ? `Price: ${card.price}` : "Price: —"} ·{" "}
@@ -373,7 +383,7 @@ export default function App() {
                     </p>
                     {card.energy && <p className="meta">Energy match: {card.energy}</p>}
                     {card.time && <p className="meta">Suggested time: {card.time}</p>}
-                    {card.address && <p className="address">{card.address}</p>}
+                    {card.summary && <p className="summary">{card.summary}</p>}
                     <ul className="reason-list">
                       {card.reasons.map((reason) => (
                         <li key={reason}>{reason}</li>
@@ -381,11 +391,18 @@ export default function App() {
                     </ul>
                     <footer>
                       <span className="score">Score {Math.round(card.group_score * 100)}%</span>
-                      {card.booking_url && (
-                        <a href={card.booking_url} target="_blank" rel="noreferrer">
-                          Book / Share
-                        </a>
-                      )}
+                      <div className="links">
+                        {card.booking_url && (
+                          <a href={card.booking_url} target="_blank" rel="noreferrer">
+                            Event Link
+                          </a>
+                        )}
+                        {card.maps_url && (
+                          <a href={card.maps_url} target="_blank" rel="noreferrer">
+                            Map
+                          </a>
+                        )}
+                      </div>
                     </footer>
                   </article>
                 ))}

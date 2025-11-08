@@ -264,6 +264,21 @@ fieldset.friends {
   line-height: 1.4;
 }
 
+.empty-state {
+  background: rgba(99, 179, 237, 0.12);
+  border: 1px solid rgba(99, 179, 237, 0.25);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  display: grid;
+  gap: 0.5rem;
+  color: #bee3f8;
+}
+
+.empty-state h3 {
+  margin: 0;
+  color: #f7fafc;
+}
+
 .badge {
   background: rgba(129, 230, 217, 0.22);
   color: #0f172a;
@@ -332,6 +347,13 @@ fieldset.friends {
   font-weight: 500;
 }
 
+.summary {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
 .reason-list {
   margin: 0;
   padding-left: 1.1rem;
@@ -344,6 +366,7 @@ fieldset.friends {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
 }
 
 .score {
@@ -351,10 +374,19 @@ fieldset.friends {
   font-weight: 600;
 }
 
+.plan-card .links {
+  display: flex;
+  gap: 0.75rem;
+}
+
 .plan-card a {
   color: #63b3ed;
   text-decoration: none;
   font-weight: 600;
+}
+
+.plan-card a:hover {
+  text-decoration: underline;
 }
 
 footer {
