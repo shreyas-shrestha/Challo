@@ -1,8 +1,12 @@
 # These are the callable “functions” the LLM will use.
 # In dev, they can return mock data; Friend 2 will later wire real APIs.
 
-from typing import List, Dict, Any
-from backend.schemas import UserTaste, PlanCard
+import os
+from typing import List, Dict, Any, Optional
+
+import httpx
+
+from backend.schemas import UserTaste
 
 # === Data-access contracts Friend 2 will implement for real ===
 def tool_get_user_taste(user_id: str) -> UserTaste:
@@ -46,6 +50,68 @@ def tool_merge_tastes(tastes: List[UserTaste]) -> Dict[str, Any]:
     tags = list({tg for t in tastes for tg in t.tags})
     return {"merged_vibe": merged_vibe, "budget_cap": budget, "distance_cap": distance, "likes": likes, "tags": tags}
 
+def _google_price_to_band(price_level: Optional[int]) -> Optional[str]:
+    mapping = {
+        0: "free",
+        1: "$",
+        2: "$$",
+        3: "$$$",
+        4: "$$$$",
+    }
+    return mapping.get(price_level) if price_level is not None else None
+
+
+def _fetch_google_places(query: Dict[str, Any]) -> List[Dict[str, Any]]:
+    api_key = os.getenv("GOOGLE_PLACES_API_KEY")
+    if not api_key:
+        return []
+
+    search_terms: List[str] = []
+    if query.get("vibe"):
+        search_terms.append(str(query["vibe"]))
+    search_terms.extend(query.get("likes") or [])
+    if not search_terms:
+        search_terms.append("interesting activities")
+
+    location = query.get("location") or "nearby"
+    composed_query = f"{' '.join(search_terms)} in {location}"
+
+    params = {
+        "query": composed_query,
+        "key": api_key,
+    }
+
+    results: List[Dict[str, Any]] = []
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.get(
+                "https://maps.googleapis.com/maps/api/place/textsearch/json",
+                params=params,
+            )
+            data = resp.json()
+    except Exception:
+        return []
+
+    for place in data.get("results", [])[:10]:
+        geometry = place.get("geometry", {}).get("location", {})
+        results.append(
+            {
+                "title": place.get("name"),
+                "vibe": query.get("vibe", "social"),
+                "price": _google_price_to_band(place.get("price_level")) or "unknown",
+                "address": place.get("formatted_address"),
+                "lat": geometry.get("lat"),
+                "lng": geometry.get("lng"),
+                "distance_km": None,
+                "booking_url": place.get("website")
+                or f"https://maps.google.com/?q={place.get('place_id')}",
+                "source": "google_places",
+                "tags": place.get("types") or [],
+            }
+        )
+    return results
+
+
 def tool_find_activities(query: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Input keys (example): {
@@ -54,7 +120,11 @@ def tool_find_activities(query: Dict[str, Any]) -> List[Dict[str, Any]]:
     }
     Return raw candidates; Writer will turn into PlanCard.
     """
-    # TODO: swap for Google Places / Eventbrite / Meetup
+    google_results = _fetch_google_places(query)
+    if google_results:
+        return google_results
+
+    # Fallback cached data for demo mode.
     return [
         {
             "title": "Sunset Kayak Meetup",

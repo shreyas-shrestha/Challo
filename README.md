@@ -28,6 +28,12 @@ uvicorn backend.api:app --host 0.0.0.0 --port 8000
 
 > Optional: if you later add embedding/ranking features, install heavier ML libraries (e.g. `sentence-transformers`) manually. They are excluded from `requirements.txt` so Railway’s free tier stays within build limits.
 
+Environment variables (backend):
+
+- `GEMINI_API_KEY` *(optional)* — enables Google Gemini for the listener/writer agents. Without it, the service falls back to deterministic mocks.
+- `GEMINI_MODEL` *(optional, default `gemini-1.5-flash`)* — override the Gemini model.
+- `GOOGLE_PLACES_API_KEY` *(optional)* — enables live place discovery via Google Places; otherwise cached Cambridge data is used.
+
 Test locally:
 
 ```bash

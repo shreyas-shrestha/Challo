@@ -1,11 +1,47 @@
 # backend/agents.py
+import json
+import os
 from typing import List, Dict, Any, Optional
 from .prompts import SYSTEM_LISTENER, SYSTEM_PLANNER, SYSTEM_WRITER
 from .schemas import UserTaste, PlanCard
 from .tools import tool_get_user_taste, tool_merge_tastes, tool_find_activities
 
-# Stub LLM that returns deterministic JSON for dev; swap with real LLM later.
 def llm_json(prompt: str, system: str) -> Dict[str, Any]:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if api_key:
+        try:
+            import google.generativeai as genai  # type: ignore
+
+            genai.configure(api_key=api_key)
+            model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(
+                [
+                    {
+                        "role": "user",
+                        "parts": [
+                            f"{system.strip()}\n\nUser request:\n{prompt.strip()}\n\nRespond with compact JSON only."
+                        ],
+                    }
+                ],
+                generation_config={
+                    "temperature": 0.1,
+                    "response_mime_type": "application/json",
+                },
+            )
+            text = getattr(response, "text", None)
+            if not text and response.candidates:
+                text = "".join(
+                    part.text or ""
+                    for part in response.candidates[0].content.parts
+                )
+            if text:
+                return json.loads(text)
+        except Exception:
+            # Fall back to deterministic mock response if Gemini fails.
+            pass
+
+    # Mock fallback for local development without Gemini access.
     if system == SYSTEM_LISTENER:
         return {
             "primary_vibes": ["outdoors", "music"],
