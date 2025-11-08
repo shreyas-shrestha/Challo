@@ -1,0 +1,90 @@
+# backend/agents.py
+from typing import List, Dict, Any, Optional
+from .prompts import SYSTEM_LISTENER, SYSTEM_PLANNER, SYSTEM_WRITER
+from .schemas import UserTaste, PlanCard
+from .tools import tool_get_user_taste, tool_merge_tastes, tool_find_activities
+
+# Stub LLM that returns deterministic JSON for dev; swap with real LLM later.
+def llm_json(prompt: str, system: str) -> Dict[str, Any]:
+    if system == SYSTEM_LISTENER:
+        return {
+            "primary_vibes": ["outdoors", "music"],
+            "budget_hint": "<20",
+            "indoor_outdoor": "outdoor",
+            "energy_level": "medium",
+            "time_hint": "today after 5pm"
+        }
+    return {}
+
+class ListenerAgent:
+    def run(self, query_text: str) -> Dict[str, Any]:
+        # In production: call your real LLM with SYSTEM_LISTENER
+        return llm_json(prompt=query_text, system=SYSTEM_LISTENER)
+
+class PlannerAgent:
+    def run(
+        self,
+        user_ids: List[str],
+        listener_out: Dict[str, Any],
+        location_hint: str,
+        time_window: Optional[str]
+    ) -> Dict[str, Any]:
+        # 1) fetch tastes
+        tastes = [tool_get_user_taste(uid) for uid in user_ids]
+        # 2) merge constraints and preferences
+        merged = tool_merge_tastes(tastes)
+        merged["location"] = location_hint
+        merged["time_window"] = time_window or listener_out.get("time_hint")
+        # prefer listener’s top vibe if present; else merged heuristic
+        merged["vibe"] = (listener_out.get("primary_vibes") or [merged.get("merged_vibe", "chill")])[0]
+        merged["energy_level"] = listener_out.get("energy_level", "medium")
+        # 3) search activities
+        raw = tool_find_activities(merged)
+        return {"tastes": tastes, "merged": merged, "raw_candidates": raw}
+
+class WriterAgent:
+    def run(self, planner_out: Dict[str, Any]) -> List[PlanCard]:
+        merged = planner_out["merged"]
+        cards: List[PlanCard] = []
+
+        for r in planner_out["raw_candidates"]:
+            # basic scoring
+            score = 0.4
+            if r.get("vibe") == merged.get("vibe"):
+                score += 0.3
+
+            price = str(r.get("price", "")).lower()
+            budget_cap = merged.get("budget_cap")
+            if price == "free" or (price == "$" and (budget_cap is None or budget_cap >= 10)):
+                score += 0.2
+
+            # small boost for overlapping tags/likes
+            if any(t in (r.get("tags") or []) for t in merged.get("likes", [])):
+                score += 0.1
+
+            cards.append(PlanCard(
+                title=r["title"],
+                subtitle=None,
+                time=merged.get("time_window"),
+                price=r.get("price"),
+                vibe=merged.get("vibe", "chill"),
+                energy=merged.get("energy_level"),
+                address=r.get("address"),
+                lat=r.get("lat"),
+                lng=r.get("lng"),
+                distance_km=r.get("distance_km"),
+                booking_url=r.get("booking_url"),
+                group_score=min(score, 1.0),
+                reasons=[
+                    f"Matches vibe: {merged.get('vibe')}",
+                    f"Budget OK: {r.get('price')}",
+                    f"Energy: {merged.get('energy_level', 'medium')}",
+                    f"Distance ≈ {r.get('distance_km')} km"
+                ],
+                source=r.get("source", "cached")
+            ))
+
+        # sort by best fit
+        cards.sort(key=lambda c: c.group_score, reverse=True)
+        # return top 3–5
+        return cards[:5]
