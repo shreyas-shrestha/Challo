@@ -54,6 +54,11 @@ export default function App() {
   );
   const [locationHint, setLocationHint] = useState("Cambridge, MA");
   const [timeWindow, setTimeWindow] = useState("Today 5-9pm");
+  const [vibeHint, setVibeHint] = useState<Vibe | "">("music");
+  const [budgetCap, setBudgetCap] = useState("25");
+  const [distanceKm, setDistanceKm] = useState("5");
+  const [customLikesInput, setCustomLikesInput] = useState("live music, jazz picnic");
+  const [customTagsInput, setCustomTagsInput] = useState("outdoor, group");
   const [selectedFriends, setSelectedFriends] = useState<string[]>(["u1", "u2", "u3"]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +83,15 @@ export default function App() {
     []
   );
 
+  const sourceBreakdown = useMemo(() => {
+    if (!result) return [];
+    const counts = new Map<string, number>();
+    for (const card of result.candidates) {
+      counts.set(card.source, (counts.get(card.source) ?? 0) + 1);
+    }
+    return Array.from(counts.entries());
+  }, [result]);
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
@@ -85,12 +99,44 @@ export default function App() {
     setResult(null);
 
     try {
-      const data = await fetchPlan({
+      const payload: Parameters<typeof fetchPlan>[0] = {
         query_text: query,
         user_ids: selectedFriends,
         location_hint: locationHint,
         time_window: timeWindow,
-      });
+      };
+
+      if (vibeHint) {
+        payload.vibe_hint = vibeHint;
+      }
+
+      const likeList = customLikesInput
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (likeList.length) {
+        payload.custom_likes = likeList;
+      }
+
+      const tagList = customTagsInput
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (tagList.length) {
+        payload.custom_tags = tagList;
+      }
+
+      const parsedBudget = Number(budgetCap);
+      if (!Number.isNaN(parsedBudget) && parsedBudget >= 0) {
+        payload.budget_cap = parsedBudget;
+      }
+
+      const parsedDistance = Number(distanceKm);
+      if (!Number.isNaN(parsedDistance) && parsedDistance > 0) {
+        payload.distance_km = parsedDistance;
+      }
+
+      const data = await fetchPlan(payload);
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch plan.");
@@ -167,6 +213,79 @@ export default function App() {
               </div>
             </fieldset>
 
+            <div className="inputs-grid">
+              <label>
+                Vibe hint
+                <select
+                  value={vibeHint}
+                  onChange={(e) => setVibeHint(e.target.value as Vibe | "")}
+                >
+                  <option value="">Let Vivi decide</option>
+                  {(
+                    [
+                      "chill",
+                      "outdoors",
+                      "social",
+                      "artsy",
+                      "nerdy",
+                      "romantic",
+                      "active",
+                      "quiet",
+                      "creative",
+                      "music",
+                      "adventure",
+                      "mindful",
+                      "party",
+                    ] satisfies Vibe[]
+                  ).map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Budget cap ($)
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={budgetCap}
+                  onChange={(e) => setBudgetCap(e.target.value)}
+                  placeholder="e.g. 25"
+                />
+              </label>
+              <label>
+                Distance (km)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={distanceKm}
+                  onChange={(e) => setDistanceKm(e.target.value)}
+                  placeholder="e.g. 5"
+                />
+              </label>
+            </div>
+
+            <label>
+              Custom likes (comma separated)
+              <input
+                value={customLikesInput}
+                onChange={(e) => setCustomLikesInput(e.target.value)}
+                placeholder="sunset kayak, rooftops, speakeasy jazz"
+              />
+            </label>
+
+            <label>
+              Custom tags (comma separated)
+              <input
+                value={customTagsInput}
+                onChange={(e) => setCustomTagsInput(e.target.value)}
+                placeholder="live music, outdoor, group friendly"
+              />
+            </label>
+
             <button className="primary" type="submit" disabled={loading}>
               {loading ? "Orchestrating..." : "Spin up a plan"}
             </button>
@@ -229,6 +348,18 @@ export default function App() {
                   ))}
                 </div>
               </div>
+              <div className="source-meta">
+                <strong>Sources tapped:</strong>
+                {sourceBreakdown.length ? (
+                  sourceBreakdown.map(([source, count]) => (
+                    <span key={source} className="badge badge--muted">
+                      {source} × {count}
+                    </span>
+                  ))
+                ) : (
+                  <span className="badge badge--muted">Awaiting data...</span>
+                )}
+              </div>
               <div className="cards-grid">
                 {result.candidates.map((card) => (
                   <article key={card.title} className="plan-card">
@@ -254,6 +385,7 @@ export default function App() {
                     </ul>
                     <footer>
                       <span className="score">Score {Math.round(card.group_score * 100)}%</span>
+                      <span className="source-pill">{card.source}</span>
                       {card.booking_url && (
                         <a href={card.booking_url} target="_blank" rel="noreferrer">
                           Book / Share
