@@ -304,6 +304,7 @@ def _fetch_eventbrite_events(query: Dict[str, Any]) -> List[Dict[str, Any]]:
         "page_size": 25,
     }
 
+    use_address_fallback = False
     if coords:
         params["location.latitude"] = coords[0]
         params["location.longitude"] = coords[1]
@@ -312,6 +313,7 @@ def _fetch_eventbrite_events(query: Dict[str, Any]) -> List[Dict[str, Any]]:
         params["location.within"] = f"{radius_mi}mi"
     elif query.get("location"):
         params["location.address"] = query["location"]
+        use_address_fallback = True
 
     budget_cap = query.get("budget_cap")
     if budget_cap is not None:
@@ -333,19 +335,37 @@ def _fetch_eventbrite_events(query: Dict[str, Any]) -> List[Dict[str, Any]]:
     if end_iso:
         params["start_date.range_end"] = end_iso
 
-    try:
-        resp = httpx.get(
-            "https://www.eventbriteapi.com/v3/events/search/",
-            params=params,
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=10.0,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("error_description"):
-            logger.warning("Eventbrite error: %s", data["error_description"])
-    except Exception as exc:
-        logger.error("Eventbrite fetch failed: %s", exc)
+    def _query_eventbrite(search_params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        try:
+            resp = httpx.get(
+                "https://www.eventbriteapi.com/v3/events/search/",
+                params=search_params,
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("error_description"):
+                logger.warning("Eventbrite error: %s", data["error_description"])
+            return data
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404 and not use_address_fallback and query.get("location"):
+                # Retry with address fallback if coordinates caused an error
+                fallback_params = dict(search_params)
+                fallback_params.pop("location.latitude", None)
+                fallback_params.pop("location.longitude", None)
+                fallback_params.pop("location.within", None)
+                fallback_params["location.address"] = query["location"]
+                logger.info("Eventbrite 404 with coordinates; retrying with address fallback.")
+                return _query_eventbrite(fallback_params)
+            logger.error("Eventbrite fetch failed with status %s: %s", exc.response.status_code, exc)
+            return None
+        except Exception as exc:
+            logger.error("Eventbrite fetch failed: %s", exc)
+            return None
+
+    data = _query_eventbrite(params)
+    if not data:
         return []
 
     events: List[Dict[str, Any]] = []
