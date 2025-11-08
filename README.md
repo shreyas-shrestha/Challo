@@ -2,7 +2,7 @@
 
 “You bring the mood. Your friends bring the vibe. AI orchestrates the plan.”
 
-Vivi is a full-stack reimagining of the Yumi social-agentic platform, pivoting from food discovery to activity discovery. The system coordinates group moods, taste graphs, and live event data to suggest the perfect shared experience. Built for the web and deployable end-to-end on Render.
+Vivi is a full-stack reimagining of the Yumi social-agentic platform, pivoting from food discovery to activity discovery. The system coordinates group moods, taste graphs, and live event data to suggest the perfect shared experience. The repo now targets a Netlify-hosted web app paired with a FastAPI backend you can deploy on your preferred free-tier provider (Railway, Fly.io, Cloud Run, etc.).
 
 ---
 
@@ -11,7 +11,7 @@ Vivi is a full-stack reimagining of the Yumi social-agentic platform, pivoting f
 - **Frontend** — Vite + React web app (`frontend/`) that captures natural language mood prompts, lets you tag friends, and renders AI-curated plan cards.
 - **Backend** — FastAPI service (`backend/`) orchestrating multi-agent planning (listener → profile → merge → explorer → writer → scheduler) with pluggable tool functions.
 - **Data Contracts** — Typed schemas in `backend/schemas.py`; mock tool implementations ready to be swapped for Supabase, Google Places, Eventbrite, Meetup, TikTok sentiment, etc.
-- **Deployment** — `render.yaml` blueprint provisions a Python web service (`vivi-api`) and a static site (`vivi-web`). Environment variables stubbed for Gemini, Claude, OpenAI.
+- **Deployment** — `netlify.toml` drives the static build on Netlify. Deploy the FastAPI backend separately (Railway shown below) and point the frontend via `VITE_API_BASE_URL`.
 
 ---
 
@@ -51,17 +51,32 @@ Set `VITE_API_BASE_URL=http://localhost:8000` in a `.env.local` file to point at
 
 ---
 
-## Render Deployment
+## Deploying the Backend (Railway example)
 
-1. Push this repo to GitHub.
-2. In Render, “New Blueprint” → connect repository → deploy.
-3. Configure `VITE_API_BASE_URL` for `vivi-web` to the public URL of `vivi-api`.
-4. Add real API keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `CLAUDE_API_KEY`) to the backend service when ready to swap the mock LLM/tool functions.
+1. Install the Railway CLI and log in: `npm i -g @railway/cli && railway login`.
+2. From the repo root run `railway init`, choose “Empty Project,” and follow prompts.
+3. Set build/run commands in the Railway dashboard (or `.railway/config.json`):
+   - Install: `pip install -r requirements.txt`
+   - Start: `uvicorn backend.api:app --host 0.0.0.0 --port 8080`
+4. Add environment variables (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `CLAUDE_API_KEY`, etc.).
+5. Deploy — Railway will expose a public HTTPS URL (note the port defaults to 8080).
 
-Render spins up:
+Any other container-friendly host (Fly.io, Google Cloud Run, Heroku, DigitalOcean App Platform) can reuse those commands.
 
-- `vivi-api` — Python web service running `uvicorn backend.api:app`.
-- `vivi-web` — Static site that serves the Vite build from `frontend/dist`.
+## Deploying the Frontend (Netlify)
+
+The included `netlify.toml` configures Netlify to build from the `frontend/` directory.
+
+1. Push this repo to GitHub/GitLab/Bitbucket.
+2. In Netlify, click “Add new site” → “Import an existing project.”
+3. Choose the repo and branch. Netlify reads `netlify.toml`, so the build command becomes:
+   - Base directory: `frontend`
+   - Build command: `npm install && npm run build`
+   - Publish directory: `dist`
+4. Set environment variable `VITE_API_BASE_URL` (under Site settings → Build & deploy → Environment) to the public URL of your backend (e.g. `https://vivi-api-production.up.railway.app`).
+5. Deploy. Each push to the selected branch auto-triggers a rebuild.
+
+Optional: remove or adjust the redirect in `netlify.toml` once you know your backend URL.
 
 ---
 
