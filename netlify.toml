@@ -1,10 +1,15 @@
 [build]
   base = "frontend"
   command = "npm install && npm run build"
-  publish = "dist"
+  publish = ".next"
 
 [build.environment]
-  VITE_API_BASE_URL = "https://questai-production-b5ef.up.railway.app"
+  NODE_VERSION = "20"
+  NEXT_TELEMETRY_DISABLED = "1"
+  NEXT_PUBLIC_API_BASE_URL = "https://questai-production-b5ef.up.railway.app"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 [[redirects]]
   from = "/health"
