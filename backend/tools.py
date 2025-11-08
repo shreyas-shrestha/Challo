@@ -306,6 +306,14 @@ def _fetch_eventbrite_events(query: Dict[str, Any]) -> List[Dict[str, Any]]:
         elif budget_cap <= 35:
             params["price"] = "paid"
 
+    def _ensure_z(value: Optional[str]) -> Optional[str]:
+        if not value:
+            return value
+        return value if value.endswith(("Z", "z")) else f"{value}Z"
+
+    start_iso = _ensure_z(start_iso)
+    end_iso = _ensure_z(end_iso)
+
     if start_iso:
         params["start_date.range_start"] = start_iso
     if end_iso:
