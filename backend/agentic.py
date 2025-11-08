@@ -3,7 +3,16 @@ import os
 
 from .schemas import GroupRequest, PlanResponse, PlanCard
 from .agents import ListenerAgent, WriterAgent, llm_json
-from .tools import tool_get_user_taste, tool_merge_tastes, tool_find_activities
+from .tools import (
+    tool_get_user_taste,
+    tool_merge_tastes,
+    tool_find_activities,
+    tool_get_user_taste_cached,
+    tool_search_places_grid,
+    tool_sentiment_enrich,
+    tool_calendar_probe,
+    tool_reserve_table,
+)
 from .prompts import SYSTEM_CONTROLLER
 
 
@@ -80,7 +89,7 @@ class AgenticController:
 
             if action == "get_tastes":
                 user_ids = args.get("user_ids") or state["user_ids"]
-                tastes = [tool_get_user_taste(uid) for uid in user_ids]
+                tastes = [tool_get_user_taste_cached(uid) for uid in user_ids]
                 state["tastes"] = tastes
                 obs = f"Fetched tastes for {len(tastes)} users"
                 state["observations"].append(obs)
@@ -119,6 +128,51 @@ class AgenticController:
                 obs = f"Found {len(raw)} activities"
                 state["observations"].append(obs)
                 action_log.append("Controller:find_activities")
+                continue
+
+            if action == "search_places_grid":
+                merged = state.get("merged") or {}
+                if not merged:
+                    # ensure merged exists
+                    if not state["tastes"]:
+                        state["tastes"] = [tool_get_user_taste_cached(uid) for uid in state["user_ids"]]
+                    merged = tool_merge_tastes(state["tastes"])
+                    merged["location"] = state["location"]
+                    merged["time_window"] = state["time_window"] or state["listener"].get("time_hint")
+                    merged["vibe"] = (state["listener"].get("primary_vibes") or [merged.get("merged_vibe", "chill")])[0]
+                    merged["energy_level"] = state["listener"].get("energy_level", "medium")
+                    state["merged"] = merged
+                grid = tool_search_places_grid(merged)
+                # prefer union with prior candidates
+                prev = state.get("raw_candidates") or []
+                state["raw_candidates"] = (prev or []) + grid
+                obs = f"Grid search yielded {len(grid)} candidates"
+                state["observations"].append(obs)
+                action_log.append("Controller:search_places_grid")
+                continue
+
+            if action == "enrich_sentiment":
+                prev = state.get("raw_candidates") or []
+                enriched = tool_sentiment_enrich(prev)
+                state["raw_candidates"] = enriched
+                obs = "Enriched candidates with sentiment"
+                state["observations"].append(obs)
+                action_log.append("Controller:enrich_sentiment")
+                continue
+
+            if action == "probe_calendar":
+                cal = tool_calendar_probe(state["user_ids"], state.get("time_window"))
+                state["observations"].append(f"Calendar probe: {cal.get('availability')}")
+                action_log.append("Controller:probe_calendar")
+                continue
+
+            if action == "reserve":
+                idx = args.get("index", 0)
+                pool = state.get("raw_candidates") or []
+                if pool and 0 <= idx < len(pool):
+                    res = tool_reserve_table(pool[idx])
+                    state["observations"].append(f"Reservation: {res.get('reservation_supported')}")
+                action_log.append("Controller:reserve")
                 continue
 
             if action == "finalize":

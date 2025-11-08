@@ -5,6 +5,7 @@ import os
 import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
+from functools import lru_cache
 
 import httpx
 from backend.schemas import UserTaste
@@ -390,3 +391,53 @@ def tool_find_activities(query: Dict[str, Any]) -> List[Dict[str, Any]]:
             "tags": ["night", "dance", "social"],
         },
     ]
+
+# === Inspired extensions (stubs for agentic flow) ===
+
+@lru_cache(maxsize=512)
+def tool_get_user_taste_cached(user_id: str) -> UserTaste:
+    """
+    Lightweight in-process cache for user tastes.
+    Replace with Supabase row fetch + HTTP cache headers.
+    """
+    return tool_get_user_taste(user_id)
+
+
+def tool_search_places_grid(query: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Grid-style expansion for dense urban discovery.
+    For demo: call the same finder, but tag results to indicate grid search.
+    """
+    base = tool_find_activities(query)
+    for r in base:
+        r.setdefault("tags", [])
+        if "grid" not in r["tags"]:
+            r["tags"].append("grid")
+    return base
+
+
+def tool_sentiment_enrich(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Stub sentiment enrichment. In production, aggregate reviews/social posts and
+    attach sentiment facets. Here we just add a neutral sentiment flag.
+    """
+    enriched: List[Dict[str, Any]] = []
+    for c in candidates:
+        item = dict(c)
+        item["sentiment"] = {"overall": "neutral", "confidence": 0.6}
+        enriched.append(item)
+    return enriched
+
+
+def tool_calendar_probe(user_ids: List[str], time_window: Optional[str]) -> Dict[str, Any]:
+    """
+    Stub calendar probe. In production, query Google Calendar/Outlook with OAuth.
+    """
+    return {"availability": "unknown", "users": user_ids, "time_window": time_window}
+
+
+def tool_reserve_table(candidate: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Stub reservation hook. In production, integrate with OpenTable/inline or call venue.
+    """
+    return {"reservation_supported": False, "booking_url": candidate.get("booking_url")}

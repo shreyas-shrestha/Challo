@@ -27,6 +27,10 @@ Available tools (choose one 'action' per step):
 - get_tastes(args: {user_ids: string[]})
 - merge_tastes(args: {overrides?: {location?: string, time_window?: string, vibe?: string, energy_level?: 'low'|'medium'|'high'}})
 - find_activities(args: {})
+- search_places_grid(args: {})
+- enrich_sentiment(args: {})
+- probe_calendar(args: {})
+- reserve(args: {index?: number})
 - finalize(args: {})
 
 State context provided to you:
@@ -35,14 +39,16 @@ State context provided to you:
 - tastes: array of user taste profiles if already fetched
 - merged: merged constraints/preferences if already computed
 - observations: chronological log of tool results
+- raw_candidates: list of raw candidates, possibly enriched with sentiment
 
 Your job:
 1) Fetch tastes, 2) Merge with overrides from listener, 3) Find activities,
-4) Finalize when you have 3–5 good candidates.
+4) Optionally grid-search to broaden results, 5) Optionally enrich with sentiment,
+6) Optionally probe calendars, 7) Optionally reserve, 8) Finalize when you have 3–5 good candidates.
 
 Output JSON schema (no prose):
 {
-  "action": "get_tastes" | "merge_tastes" | "find_activities" | "finalize",
+  "action": "get_tastes" | "merge_tastes" | "find_activities" | "search_places_grid" | "enrich_sentiment" | "probe_calendar" | "reserve" | "finalize",
   "args": { ... },
   "rationale": "short reason for the chosen action"
 }
