@@ -371,507 +371,340 @@ export default function App() {
   }
 
   return (
-    <div className="experience-shell">
-      <div className="map-stage">
+    <div className="map-first-shell">
+      <div className="map-surface">
         {hasMapboxToken ? (
-          <div ref={mapContainerRef} className="map-canvas" />
+          <div ref={mapContainerRef} className="mapbox-view" />
         ) : (
           <div className="map-fallback">
             <div className="map-fallback__card">
-              <h2>Map preview locked</h2>
+              <h2>Add your Mapbox token</h2>
               <p>
-                Drop your <code>VITE_MAPBOX_ACCESS_TOKEN</code> into the environment to unlock the
-                live map. Event cards and plans still render below.
+                Set <code>VITE_MAPBOX_ACCESS_TOKEN</code> to unlock the live map. You can still see
+                events in the panel.
               </p>
             </div>
           </div>
         )}
       </div>
 
-      <div className="hud-layer">
-        <div className="hud-inner">
-          <header className="hud-header">
+      <div className="ui-overlay">
+        <div className="control-panel">
+          <header className="control-panel__header">
             <span className="brand">Vivi</span>
-            <p className="tagline">
-              The agentic social activity network. You bring the vibe. Your friends bring the time.
-              AI orchestrates the plan.
-            </p>
-            <div className="hud-badges">
-              <span className="hud-badge">Agent Graph</span>
-              <span className="hud-badge">Eventbrite + Google Places</span>
-              <span className="hud-badge">Live Map</span>
-            </div>
+            <p className="hint">Drop a mood, and Vivi will surface aligned events instantly.</p>
           </header>
 
-          <div className="hud-grid">
-            <section className="panel planner-panel">
-              <h2>Compose the vibe</h2>
-              <form onSubmit={onSubmit}>
-                <label>
-                  Mood Input
-                  <textarea
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="What's the vibe?"
-                    rows={3}
-                  />
-                </label>
+          <form className="control-panel__form" onSubmit={onSubmit}>
+            <label>
+              Prompt
+              <textarea
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                rows={2}
+                placeholder="Tonight we're broke but want outdoorsy music near Cambridge."
+              />
+            </label>
 
-                <div className="inputs-grid">
-                  <label>
-                    Where?
-                    <input
-                      value={locationHint}
-                      onChange={(e) => setLocationHint(e.target.value)}
-                      placeholder="Neighborhood or city"
-                    />
-                  </label>
-                  <label>
-                    When?
-                    <input
-                      value={timeWindow}
-                      onChange={(e) => setTimeWindow(e.target.value)}
-                      placeholder="e.g. Tonight 6-9pm"
-                    />
-                  </label>
-                </div>
-
-                <div className="inputs-grid">
-                  <label>
-                    Optional vibe hint
-                    <input
-                      value={vibeHint}
-                      onChange={(e) => setVibeHint(e.target.value)}
-                      placeholder="music, outdoors, romantic..."
-                    />
-                  </label>
-                  <label>
-                    Budget cap (USD)
-                    <input
-                      value={budgetCap}
-                      onChange={(e) => setBudgetCap(e.target.value)}
-                      type="number"
-                      min="0"
-                      placeholder="20"
-                    />
-                  </label>
-                  <label>
-                    Distance max (km)
-                    <input
-                      value={distanceKm}
-                      onChange={(e) => setDistanceKm(e.target.value)}
-                      type="number"
-                      min="0"
-                      placeholder="5"
-                    />
-                  </label>
-                </div>
-
-                <label>
-                  Custom likes (comma separated)
-                  <input
-                    value={customLikes}
-                    onChange={(e) => setCustomLikes(e.target.value)}
-                    placeholder="live music, cafe crawl, art pop-up"
-                  />
-                </label>
-
-                <label>
-                  Tags or constraints (comma separated)
-                  <input
-                    value={customTags}
-                    onChange={(e) => setCustomTags(e.target.value)}
-                    placeholder="outdoor, group-friendly, free"
-                  />
-                </label>
-
-                <fieldset className="friends">
-                  <legend>Tag friends to merge their vibes</legend>
-                  <div className="chips">
-                    {FRIENDS.map((friend) => {
-                      const active = selectedFriends.includes(friend.id);
-                      return (
-                        <button
-                          key={friend.id}
-                          type="button"
-                          className={`chip ${active ? "chip--active" : ""}`}
-                          onClick={() => toggleFriend(friend.id)}
-                        >
-                          <span>{friend.name}</span>
-                          <small>{friend.tags.join(" · ")}</small>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </fieldset>
-
-                {selectedFriends.map((friendId) => {
-                  const friend = FRIENDS.find((f) => f.id === friendId);
-                  const inputs = friendInputs[friendId] || {
-                    likes: "",
-                    vibes: "",
-                    tags: "",
-                    budget: "",
-                    distance: "",
-                  };
-                  return (
-                    <div key={friendId} className="friend-overrides">
-                      <h3>{friend?.name ?? friendId}</h3>
-                      <div className="inputs-grid">
-                        <label>
-                          Likes / activities
-                          <input
-                            value={inputs.likes}
-                            onChange={(e) =>
-                              setFriendInputs((prev) => ({
-                                ...prev,
-                                [friendId]: { ...inputs, likes: e.target.value },
-                              }))
-                            }
-                            placeholder="live music, pottery class..."
-                          />
-                        </label>
-                        <label>
-                          Preferred vibes
-                          <input
-                            value={inputs.vibes}
-                            onChange={(e) =>
-                              setFriendInputs((prev) => ({
-                                ...prev,
-                                [friendId]: { ...inputs, vibes: e.target.value },
-                              }))
-                            }
-                            placeholder="music, adventure..."
-                          />
-                        </label>
-                      </div>
-                      <div className="inputs-grid">
-                        <label>
-                          Tags / constraints
-                          <input
-                            value={inputs.tags}
-                            onChange={(e) =>
-                              setFriendInputs((prev) => ({
-                                ...prev,
-                                [friendId]: { ...inputs, tags: e.target.value },
-                              }))
-                            }
-                            placeholder="nightlife, outdoor..."
-                          />
-                        </label>
-                        <label>
-                          Budget max (USD)
-                          <input
-                            type="number"
-                            min="0"
-                            value={inputs.budget}
-                            onChange={(e) =>
-                              setFriendInputs((prev) => ({
-                                ...prev,
-                                [friendId]: { ...inputs, budget: e.target.value },
-                              }))
-                            }
-                            placeholder="25"
-                          />
-                        </label>
-                        <label>
-                          Distance max (km)
-                          <input
-                            type="number"
-                            min="0"
-                            value={inputs.distance}
-                            onChange={(e) =>
-                              setFriendInputs((prev) => ({
-                                ...prev,
-                                [friendId]: { ...inputs, distance: e.target.value },
-                              }))
-                            }
-                            placeholder="5"
-                          />
-                        </label>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                <button className="primary" type="submit" disabled={loading}>
-                  {loading ? "Orchestrating..." : "Spin up a plan"}
-                </button>
-              </form>
-            </section>
-
-            <section className="panel results-panel">
-              {error && <div className="error">{error}</div>}
-              {!loading && !error && !result && (
-                <p className="placeholder">Drop a vibe above to see Vivi’s picks.</p>
-              )}
-
-              {loading && <p className="placeholder">Synthesizing mood graph...</p>}
-
-              {result && (
-                <>
-                  <div className="summary">
-                    <div>
-                      <h2>Top Picks for “{result.query_normalized}”</h2>
-                      {(result.merged_vibe || result.energy_profile) && (
-                        <p>
-                          {result.merged_vibe && (
-                            <>
-                              Shared vibe: <span className="badge">{result.merged_vibe}</span>{" "}
-                            </>
-                          )}
-                          {result.energy_profile && (
-                            <>
-                              Energy:{" "}
-                              <span className="badge badge--muted">{result.energy_profile}</span>
-                            </>
-                          )}
-                        </p>
-                      )}
-                    </div>
-                    <div className="log">
-                      {result.action_log.map((entry, idx) => (
-                        <span key={idx}>{entry}</span>
-                      ))}
-                    </div>
-                  </div>
-                  {result.candidates.length === 0 && (
-                    <div className="empty-state">
-                      <h3>No live matches yet</h3>
-                      <p>
-                        Vivi called Google Places and Eventbrite but they didn't return any hits for
-                        the current settings. Try widening the distance, budget, or tweak the vibe
-                        keywords.
-                      </p>
-                    </div>
-                  )}
-                  {lastContext && (
-                    <div className="constraints-card">
-                      <h3>Planner inputs</h3>
-                      <div className="constraint-grid">
-                        <span>
-                          <strong>Where:</strong> {lastContext.location}
-                        </span>
-                        <span>
-                          <strong>When:</strong> {lastContext.time}
-                        </span>
-                        {lastContext.vibeHint && (
-                          <span>
-                            <strong>Vibe hint:</strong> {lastContext.vibeHint}
-                          </span>
-                        )}
-                        {lastContext.budget !== undefined && (
-                          <span>
-                            <strong>Budget ≤</strong> ${lastContext.budget}
-                          </span>
-                        )}
-                        {lastContext.distance !== undefined && (
-                          <span>
-                            <strong>Radius ≤</strong> {lastContext.distance} km
-                          </span>
-                        )}
-                        {lastContext.likes.length > 0 && (
-                          <span className="list-line">
-                            <strong>Likes:</strong> {lastContext.likes.join(", ")}
-                          </span>
-                        )}
-                        {lastContext.tags.length > 0 && (
-                          <span className="list-line">
-                            <strong>Tags:</strong> {lastContext.tags.join(", ")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  <div className="cards-grid">
-                    {result.candidates.map((card) => (
-                      <article key={card.title} className="plan-card">
-                        <header>
-                          <div>
-                            <h3>{card.title}</h3>
-                            {card.address && <p className="address">{card.address}</p>}
-                          </div>
-                          {card.vibe && (
-                            <span
-                              className="vibe-pill"
-                              style={{
-                                backgroundColor:
-                                  vibePalette[card.vibe.toLowerCase()] ?? "#CBD5F5",
-                              }}
-                            >
-                              {card.vibe}
-                            </span>
-                          )}
-                        </header>
-                        <p className="meta">
-                          {card.price ? `Price: ${card.price}` : "Price: —"} ·{" "}
-                          {card.distance_km ? `${card.distance_km} km` : "distance unknown"} ·{" "}
-                          <span className="source-pill">{card.source}</span>
-                        </p>
-                        {card.energy && <p className="meta">Energy match: {card.energy}</p>}
-                        {card.time && <p className="meta">Suggested time: {card.time}</p>}
-                        {card.summary && <p className="summary">{card.summary}</p>}
-                        <ul className="reason-list">
-                          {card.reasons.map((reason) => (
-                            <li key={reason}>{reason}</li>
-                          ))}
-                        </ul>
-                        <footer>
-                          <span className="score">Score {Math.round(card.group_score * 100)}%</span>
-                          <div className="links">
-                            {card.booking_url && (
-                              <a href={card.booking_url} target="_blank" rel="noreferrer">
-                                Event Link
-                              </a>
-                            )}
-                            {card.maps_url && (
-                              <a href={card.maps_url} target="_blank" rel="noreferrer">
-                                Map
-                              </a>
-                            )}
-                          </div>
-                        </footer>
-                      </article>
-                    ))}
-                  </div>
-                </>
-              )}
-            </section>
-          </div>
-
-          <section className="panel concept-panel">
-            <h2>Agent graph workflow</h2>
-            <p>
-              Vivi listens to your mood, retrieves everyone’s preferences, merges the vibes, scouts
-              the city, and drafts a ready-to-book plan card — all in seconds.
-            </p>
-            <ul>
-              <li>
-                <strong>Listener</strong> parses emotion + intent.
-              </li>
-              <li>
-                <strong>Profile</strong> maps taste graphs.
-              </li>
-              <li>
-                <strong>Merge</strong> finds the overlap.
-              </li>
-              <li>
-                <strong>Explorer</strong> combs APIs for matches.
-              </li>
-              <li>
-                <strong>Writer</strong> crafts vibe cards.
-              </li>
-              <li>
-                <strong>Scheduler</strong> syncs the squad.
-              </li>
-            </ul>
-          </section>
-
-          <section className="panel events-panel">
-            <div className="events-header">
-              <div>
-                <h2>Live event stream</h2>
-                <p>
-                  Tune the agent to Eventbrite & Google Places. Pins drop on the map instantly when
-                  you refresh.
-                </p>
-              </div>
-              <span className="source-pill">mock data</span>
-            </div>
-            <form className="event-form" onSubmit={handleEventSearchSubmit}>
-              <label>
-                Keywords
-                <input
-                  value={eventQuery}
-                  onChange={(e) => setEventQuery(e.target.value)}
-                  placeholder="live music, sunset, comedy"
-                />
-              </label>
+            <div className="control-panel__row">
               <label>
                 Location
                 <input
-                  value={eventLocation}
-                  onChange={(e) => setEventLocation(e.target.value)}
-                  placeholder="City or neighborhood"
+                  value={locationHint}
+                  onChange={(e) => setLocationHint(e.target.value)}
+                  placeholder="Cambridge, MA"
                 />
               </label>
               <label>
-                Vibe filter
+                Time
                 <input
-                  value={eventVibeFilter}
-                  onChange={(e) => setEventVibeFilter(e.target.value)}
-                  placeholder="music, outdoors, cozy"
+                  value={timeWindow}
+                  onChange={(e) => setTimeWindow(e.target.value)}
+                  placeholder="Tonight 5-9pm"
                 />
               </label>
-              <label className="event-provider">
+            </div>
+
+            <div className="control-panel__row">
+              <label>
+                Interests
+                <input
+                  value={customLikes}
+                  onChange={(e) => setCustomLikes(e.target.value)}
+                  placeholder="live music, sunset picnic"
+                />
+              </label>
+              <label>
+                Tags
+                <input
+                  value={customTags}
+                  onChange={(e) => setCustomTags(e.target.value)}
+                  placeholder="outdoor, group, evening"
+                />
+              </label>
+            </div>
+
+            <div className="control-panel__row">
+              <label>
+                Vibe
+                <input
+                  value={vibeHint}
+                  onChange={(e) => setVibeHint(e.target.value)}
+                  placeholder="music"
+                />
+              </label>
+              <label>
+                Budget $
+                <input
+                  value={budgetCap}
+                  onChange={(e) => setBudgetCap(e.target.value)}
+                  type="number"
+                  min="0"
+                />
+              </label>
+              <label>
+                Radius km
+                <input
+                  value={distanceKm}
+                  onChange={(e) => setDistanceKm(e.target.value)}
+                  type="number"
+                  min="0"
+                />
+              </label>
+            </div>
+
+            <details className="advanced">
+              <summary>Friends & providers</summary>
+              <fieldset className="friends">
+                <div className="chips">
+                  {FRIENDS.map((friend) => {
+                    const active = selectedFriends.includes(friend.id);
+                    return (
+                      <button
+                        key={friend.id}
+                        type="button"
+                        className={`chip ${active ? "chip--active" : ""}`}
+                        onClick={() => toggleFriend(friend.id)}
+                      >
+                        <span>{friend.name}</span>
+                        <small>{friend.tags.join(" · ")}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+              {selectedFriends.map((friendId) => {
+                const friend = FRIENDS.find((f) => f.id === friendId);
+                const inputs = friendInputs[friendId] || {
+                  likes: "",
+                  vibes: "",
+                  tags: "",
+                  budget: "",
+                  distance: "",
+                };
+                return (
+                  <div key={friendId} className="friend-overrides">
+                    <header>
+                      <h3>{friend?.name ?? friendId}</h3>
+                      <span>{friend?.tags.join(" / ")}</span>
+                    </header>
+                    <div className="control-panel__row">
+                      <label>
+                        Likes
+                        <input
+                          value={inputs.likes}
+                          onChange={(e) =>
+                            setFriendInputs((prev) => ({
+                              ...prev,
+                              [friendId]: { ...inputs, likes: e.target.value },
+                            }))
+                          }
+                          placeholder="live music"
+                        />
+                      </label>
+                      <label>
+                        Vibes
+                        <input
+                          value={inputs.vibes}
+                          onChange={(e) =>
+                            setFriendInputs((prev) => ({
+                              ...prev,
+                              [friendId]: { ...inputs, vibes: e.target.value },
+                            }))
+                          }
+                          placeholder="creative"
+                        />
+                      </label>
+                    </div>
+                    <div className="control-panel__row">
+                      <label>
+                        Tags
+                        <input
+                          value={inputs.tags}
+                          onChange={(e) =>
+                            setFriendInputs((prev) => ({
+                              ...prev,
+                              [friendId]: { ...inputs, tags: e.target.value },
+                            }))
+                          }
+                          placeholder="outdoor"
+                        />
+                      </label>
+                      <label>
+                        Budget $
+                        <input
+                          type="number"
+                          min="0"
+                          value={inputs.budget}
+                          onChange={(e) =>
+                            setFriendInputs((prev) => ({
+                              ...prev,
+                              [friendId]: { ...inputs, budget: e.target.value },
+                            }))
+                          }
+                        />
+                      </label>
+                      <label>
+                        Radius km
+                        <input
+                          type="number"
+                          min="0"
+                          value={inputs.distance}
+                          onChange={(e) =>
+                            setFriendInputs((prev) => ({
+                              ...prev,
+                              [friendId]: { ...inputs, distance: e.target.value },
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <label>
                 Provider
                 <select
                   value={eventProvider}
                   onChange={(e) => setEventProvider(e.target.value as EventProviderOption)}
                 >
-                  <option value="all">All providers</option>
-                  <option value="eventbrite">Eventbrite</option>
-                  <option value="google_places">Google Places</option>
+                  <option value="all">Eventbrite + Google Places</option>
+                  <option value="eventbrite">Eventbrite only</option>
+                  <option value="google_places">Google Places only</option>
                 </select>
               </label>
-              <button className="secondary" type="submit" disabled={eventsLoading}>
-                {eventsLoading ? "Searching..." : "Refresh map"}
-              </button>
-            </form>
-            <div className="event-results">
-              {eventsLoading && <p className="placeholder">Loading events...</p>}
-              {eventsError && <div className="error">{eventsError}</div>}
-              {!eventsLoading && !eventsError && events.length === 0 && (
-                <p className="placeholder">
-                  No events matched the current filters. Try adjusting the keywords or location.
-                </p>
-              )}
-              {!eventsLoading && !eventsError && events.length > 0 && (
-                <div className="event-cards">
-                  {events.map((event) => (
-                    <button
-                      key={event.id}
-                      type="button"
-                      className={`event-card ${activeEventId === event.id ? "event-card--active" : ""}`}
-                      onClick={() => handleEventCardClick(event)}
-                    >
-                      <div className="event-card__content">
-                        <h3>{event.title}</h3>
-                        <p className="event-card__address">{event.venue ?? event.address ?? "TBA"}</p>
-                        <p className="event-card__meta">
-                          {event.price ? `Price: ${event.price}` : "Price: —"} ·{" "}
-                          <span className="source-pill">{event.source}</span>
-                        </p>
-                        {event.summary && (
-                          <p className="event-card__summary">{event.summary}</p>
-                        )}
+            </details>
+
+            <button className="primary" type="submit" disabled={loading}>
+              {loading ? "Finding matches..." : "Generate plan"}
+            </button>
+
+            {error && <div className="inline-error">{error}</div>}
+          </form>
+
+          <div className="panel-output">
+            {loading && <p className="placeholder">Synthesizing picks...</p>}
+            {!loading && !result && !error && (
+              <p className="placeholder">Enter a mood + interests to see events on the map.</p>
+            )}
+            {result && (
+              <div className="plan-stack">
+                <header>
+                  <h2>{result.query_normalized}</h2>
+                  {(result.merged_vibe || result.energy_profile) && (
+                    <div className="tag-row">
+                      {result.merged_vibe && <span className="badge">{result.merged_vibe}</span>}
+                      {result.energy_profile && (
+                        <span className="badge badge--muted">{result.energy_profile}</span>
+                      )}
+                    </div>
+                  )}
+                </header>
+                <div className="candidate-list">
+                  {result.candidates.length === 0 && (
+                    <p className="placeholder">
+                      No live matches yet. Try widening the radius or adjusting keywords.
+                    </p>
+                  )}
+                  {result.candidates.map((card) => (
+                    <article key={card.title} className="candidate-card">
+                      <div>
+                        <h3>{card.title}</h3>
+                        {card.address && <span className="candidate-card__address">{card.address}</span>}
                       </div>
-                      <div className="event-card__links">
-                        {event.booking_url && (
-                          <a href={event.booking_url} target="_blank" rel="noreferrer">
-                            Event
-                          </a>
-                        )}
-                        {event.maps_url && (
-                          <a href={event.maps_url} target="_blank" rel="noreferrer">
-                            Map
-                          </a>
-                        )}
+                      <div className="candidate-card__meta">
+                        {card.price ? card.price : "Price: —"} ·{" "}
+                        {card.distance_km ? `${card.distance_km} km` : "distance unknown"} ·{" "}
+                        <span className="source-pill">{card.source}</span>
                       </div>
-                    </button>
+                      {card.summary && <p className="candidate-card__summary">{card.summary}</p>}
+                      <div className="candidate-card__footer">
+                        <span className="score">{Math.round(card.group_score * 100)}%</span>
+                        <div className="links">
+                          {card.booking_url && (
+                            <a href={card.booking_url} target="_blank" rel="noreferrer">
+                              Event
+                            </a>
+                          )}
+                          {card.maps_url && (
+                            <a href={card.maps_url} target="_blank" rel="noreferrer">
+                              Map
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </article>
                   ))}
                 </div>
-              )}
-            </div>
-          </section>
-
-          <footer className="hud-footer">
-            <p>
-              Built for crews who ask “What should we do?” Vivi learns your vibe signatures and keeps
-              the energy flowing.
-            </p>
-          </footer>
+              </div>
+            )}
+          </div>
         </div>
+
+        <aside className="event-tray">
+          <form className="event-form" onSubmit={handleEventSearchSubmit}>
+            <input
+              value={eventQuery}
+              onChange={(e) => setEventQuery(e.target.value)}
+              placeholder="Keyword"
+            />
+            <input
+              value={eventLocation}
+              onChange={(e) => setEventLocation(e.target.value)}
+              placeholder="Location"
+            />
+            <input
+              value={eventVibeFilter}
+              onChange={(e) => setEventVibeFilter(e.target.value)}
+              placeholder="Vibe"
+            />
+            <button type="submit" disabled={eventsLoading}>
+              {eventsLoading ? "..." : "Refresh"}
+            </button>
+          </form>
+
+          <div className="event-tray__list">
+            {eventsError && <div className="inline-error">{eventsError}</div>}
+            {!eventsError && eventsLoading && <p className="placeholder">Loading events...</p>}
+            {!eventsError && !eventsLoading && events.length === 0 && (
+              <p className="placeholder">No events matched. Try new keywords.</p>
+            )}
+            {events.map((event) => (
+              <button
+                key={event.id}
+                type="button"
+                className={`event-pill ${activeEventId === event.id ? "event-pill--active" : ""}`}
+                onClick={() => handleEventCardClick(event)}
+              >
+                <span className="event-pill__title">{event.title}</span>
+                <span className="event-pill__meta">
+                  {event.venue ?? event.address ?? "TBA"} · {event.price ?? "—"}
+                </span>
+              </button>
+            ))}
+          </div>
+        </aside>
       </div>
     </div>
   );
