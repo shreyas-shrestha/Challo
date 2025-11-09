@@ -371,275 +371,276 @@ export default function App() {
   }
 
   return (
-    <div className="map-first-shell">
-      <div className="map-surface">
+    <div className="map-layout">
+      <div className="map-root">
         {hasMapboxToken ? (
-          <div ref={mapContainerRef} className="mapbox-view" />
+          <div ref={mapContainerRef} className="mapbox-sheet" />
         ) : (
           <div className="map-fallback">
             <div className="map-fallback__card">
               <h2>Add your Mapbox token</h2>
               <p>
-                Set <code>VITE_MAPBOX_ACCESS_TOKEN</code> to unlock the live map. You can still see
-                events in the panel.
+                Set <code>VITE_MAPBOX_ACCESS_TOKEN</code> to enable the live map. Events still render
+                in the panels.
               </p>
             </div>
           </div>
         )}
       </div>
 
-      <div className="ui-overlay">
-        <div className="control-panel">
-          <header className="control-panel__header">
-            <span className="brand">Vivi</span>
-            <p className="hint">Drop a mood, and Vivi will surface aligned events instantly.</p>
-          </header>
+      <header className="top-bar">
+        <span className="logo">Vivi</span>
+        <div className="top-bar__meta">
+          <span>Agent graph</span>
+          <span>Eventbrite</span>
+          <span>Google Places</span>
+        </div>
+      </header>
 
-          <form className="control-panel__form" onSubmit={onSubmit}>
+      <section className="control-stack">
+        <form className="query-card" onSubmit={onSubmit}>
+          <label className="query-card__prompt">
+            <span>What do you feel like?</span>
+            <textarea
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              rows={2}
+              placeholder="Tonight we're broke but want outdoorsy music near Cambridge."
+            />
+          </label>
+
+          <div className="query-grid">
             <label>
-              Prompt
-              <textarea
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                rows={2}
-                placeholder="Tonight we're broke but want outdoorsy music near Cambridge."
+              Location
+              <input
+                value={locationHint}
+                onChange={(e) => setLocationHint(e.target.value)}
+                placeholder="Cambridge, MA"
               />
             </label>
+            <label>
+              Time
+              <input
+                value={timeWindow}
+                onChange={(e) => setTimeWindow(e.target.value)}
+                placeholder="Tonight 5-9pm"
+              />
+            </label>
+          </div>
 
-            <div className="control-panel__row">
-              <label>
-                Location
-                <input
-                  value={locationHint}
-                  onChange={(e) => setLocationHint(e.target.value)}
-                  placeholder="Cambridge, MA"
-                />
-              </label>
-              <label>
-                Time
-                <input
-                  value={timeWindow}
-                  onChange={(e) => setTimeWindow(e.target.value)}
-                  placeholder="Tonight 5-9pm"
-                />
-              </label>
-            </div>
+ 		    <div className="query-grid">
+            <label>
+              Interests
+              <input
+                value={customLikes}
+                onChange={(e) => setCustomLikes(e.target.value)}
+                placeholder="live music, sunset picnic"
+              />
+            </label>
+            <label>
+              Tags
+              <input
+                value={customTags}
+                onChange={(e) => setCustomTags(e.target.value)}
+                placeholder="outdoor, group, evening"
+              />
+            </label>
+          </div>
 
-            <div className="control-panel__row">
-              <label>
-                Interests
-                <input
-                  value={customLikes}
-                  onChange={(e) => setCustomLikes(e.target.value)}
-                  placeholder="live music, sunset picnic"
-                />
-              </label>
-              <label>
-                Tags
-                <input
-                  value={customTags}
-                  onChange={(e) => setCustomTags(e.target.value)}
-                  placeholder="outdoor, group, evening"
-                />
-              </label>
-            </div>
+          <div className="chip-row">
+            <label>
+              Vibe
+              <input
+                value={vibeHint}
+                onChange={(e) => setVibeHint(e.target.value)}
+                placeholder="music"
+              />
+            </label>
+            <label>
+              Budget $
+              <input
+                value={budgetCap}
+                onChange={(e) => setBudgetCap(e.target.value)}
+                type="number"
+                min="0"
+              />
+            </label>
+            <label>
+              Radius km
+              <input
+                value={distanceKm}
+                onChange={(e) => setDistanceKm(e.target.value)}
+                type="number"
+                min="0"
+              />
+            </label>
+          </div>
 
-            <div className="control-panel__row">
-              <label>
-                Vibe
-                <input
-                  value={vibeHint}
-                  onChange={(e) => setVibeHint(e.target.value)}
-                  placeholder="music"
-                />
-              </label>
-              <label>
-                Budget $
-                <input
-                  value={budgetCap}
-                  onChange={(e) => setBudgetCap(e.target.value)}
-                  type="number"
-                  min="0"
-                />
-              </label>
-              <label>
-                Radius km
-                <input
-                  value={distanceKm}
-                  onChange={(e) => setDistanceKm(e.target.value)}
-                  type="number"
-                  min="0"
-                />
-              </label>
-            </div>
-
-            <details className="advanced">
-              <summary>Friends & providers</summary>
-              <fieldset className="friends">
-                <div className="chips">
-                  {FRIENDS.map((friend) => {
-                    const active = selectedFriends.includes(friend.id);
-                    return (
-                      <button
-                        key={friend.id}
-                        type="button"
-                        className={`chip ${active ? "chip--active" : ""}`}
-                        onClick={() => toggleFriend(friend.id)}
-                      >
-                        <span>{friend.name}</span>
-                        <small>{friend.tags.join(" · ")}</small>
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-              {selectedFriends.map((friendId) => {
-                const friend = FRIENDS.find((f) => f.id === friendId);
-                const inputs = friendInputs[friendId] || {
-                  likes: "",
-                  vibes: "",
-                  tags: "",
-                  budget: "",
-                  distance: "",
-                };
+          <details className="query-advanced">
+            <summary>Friends & providers</summary>
+            <div className="friend-chips">
+              {FRIENDS.map((friend) => {
+                const active = selectedFriends.includes(friend.id);
                 return (
-                  <div key={friendId} className="friend-overrides">
-                    <header>
-                      <h3>{friend?.name ?? friendId}</h3>
-                      <span>{friend?.tags.join(" / ")}</span>
-                    </header>
-                    <div className="control-panel__row">
-                      <label>
-                        Likes
-                        <input
-                          value={inputs.likes}
-                          onChange={(e) =>
-                            setFriendInputs((prev) => ({
-                              ...prev,
-                              [friendId]: { ...inputs, likes: e.target.value },
-                            }))
-                          }
-                          placeholder="live music"
-                        />
-                      </label>
-                      <label>
-                        Vibes
-                        <input
-                          value={inputs.vibes}
-                          onChange={(e) =>
-                            setFriendInputs((prev) => ({
-                              ...prev,
-                              [friendId]: { ...inputs, vibes: e.target.value },
-                            }))
-                          }
-                          placeholder="creative"
-                        />
-                      </label>
-                    </div>
-                    <div className="control-panel__row">
-                      <label>
-                        Tags
-                        <input
-                          value={inputs.tags}
-                          onChange={(e) =>
-                            setFriendInputs((prev) => ({
-                              ...prev,
-                              [friendId]: { ...inputs, tags: e.target.value },
-                            }))
-                          }
-                          placeholder="outdoor"
-                        />
-                      </label>
-                      <label>
-                        Budget $
-                        <input
-                          type="number"
-                          min="0"
-                          value={inputs.budget}
-                          onChange={(e) =>
-                            setFriendInputs((prev) => ({
-                              ...prev,
-                              [friendId]: { ...inputs, budget: e.target.value },
-                            }))
-                          }
-                        />
-                      </label>
-                      <label>
-                        Radius km
-                        <input
-                          type="number"
-                          min="0"
-                          value={inputs.distance}
-                          onChange={(e) =>
-                            setFriendInputs((prev) => ({
-                              ...prev,
-                              [friendId]: { ...inputs, distance: e.target.value },
-                            }))
-                          }
-                        />
-                      </label>
-                    </div>
-                  </div>
+                  <button
+                    key={friend.id}
+                    type="button"
+                    className={`friend-chip ${active ? "friend-chip--active" : ""}`}
+                    onClick={() => toggleFriend(friend.id)}
+                  >
+                    <span>{friend.name}</span>
+                    <small>{friend.tags.join(" · ")}</small>
+                  </button>
                 );
               })}
+            </div>
 
-              <label>
-                Provider
-                <select
-                  value={eventProvider}
-                  onChange={(e) => setEventProvider(e.target.value as EventProviderOption)}
-                >
-                  <option value="all">Eventbrite + Google Places</option>
-                  <option value="eventbrite">Eventbrite only</option>
-                  <option value="google_places">Google Places only</option>
-                </select>
-              </label>
-            </details>
+            {selectedFriends.map((friendId) => {
+              const friend = FRIENDS.find((f) => f.id === friendId);
+              const inputs = friendInputs[friendId] || {
+                likes: "",
+                vibes: "",
+                tags: "",
+                budget: "",
+                distance: "",
+              };
+              return (
+                <div key={friendId} className="friend-card">
+                  <header>
+                    <span>{friend?.name ?? friendId}</span>
+                    <small>{friend?.tags.join(" / ")}</small>
+                  </header>
+                  <div className="query-grid">
+                    <label>
+                      Likes
+                      <input
+                        value={inputs.likes}
+                        onChange={(e) =>
+                          setFriendInputs((prev) => ({
+                            ...prev,
+                            [friendId]: { ...inputs, likes: e.target.value },
+                          }))
+                        }
+                        placeholder="live music"
+                      />
+                    </label>
+                    <label>
+                      Vibes
+                      <input
+                        value={inputs.vibes}
+                        onChange={(e) =>
+                          setFriendInputs((prev) => ({
+                            ...prev,
+                            [friendId]: { ...inputs, vibes: e.target.value },
+                          }))
+                        }
+                        placeholder="creative"
+                      />
+                    </label>
+                  </div>
+                  <div className="query-grid">
+                    <label>
+                      Tags
+                      <input
+                        value={inputs.tags}
+                        onChange={(e) =>
+                          setFriendInputs((prev) => ({
+                            ...prev,
+                            [friendId]: { ...inputs, tags: e.target.value },
+                          }))
+                        }
+                        placeholder="outdoor"
+                      />
+                    </label>
+                    <label>
+                      Budget $
+                      <input
+                        type="number"
+                        min="0"
+                        value={inputs.budget}
+                        onChange={(e) =>
+                          setFriendInputs((prev) => ({
+                            ...prev,
+                            [friendId]: { ...inputs, budget: e.target.value },
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Radius km
+                      <input
+                        type="number"
+                        min="0"
+                        value={inputs.distance}
+                        onChange={(e) =>
+                          setFriendInputs((prev) => ({
+                            ...prev,
+                            [friendId]: { ...inputs, distance: e.target.value },
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
 
+            <label className="provider-select">
+              Provider
+              <select
+                value={eventProvider}
+                onChange={(e) => setEventProvider(e.target.value as EventProviderOption)}
+              >
+                <option value="all">Eventbrite + Google Places</option>
+                <option value="eventbrite">Eventbrite only</option>
+                <option value="google_places">Google Places only</option>
+              </select>
+            </label>
+          </details>
+
+          <div className="query-actions">
             <button className="primary" type="submit" disabled={loading}>
-              {loading ? "Finding matches..." : "Generate plan"}
+              {loading ? "Finding matches..." : "Show events"}
             </button>
-
             {error && <div className="inline-error">{error}</div>}
-          </form>
+          </div>
+        </form>
 
-          <div className="panel-output">
-            {loading && <p className="placeholder">Synthesizing picks...</p>}
-            {!loading && !result && !error && (
-              <p className="placeholder">Enter a mood + interests to see events on the map.</p>
-            )}
-            {result && (
-              <div className="plan-stack">
-                <header>
-                  <h2>{result.query_normalized}</h2>
-                  {(result.merged_vibe || result.energy_profile) && (
-                    <div className="tag-row">
-                      {result.merged_vibe && <span className="badge">{result.merged_vibe}</span>}
-                      {result.energy_profile && (
-                        <span className="badge badge--muted">{result.energy_profile}</span>
-                      )}
-                    </div>
+        <div className="result-card">
+          {loading && <p className="placeholder">Synthesizing picks...</p>}
+          {!loading && !result && !error && (
+            <p className="placeholder">Enter a mood and interests to surface events on the map.</p>
+          )}
+          {result && (
+            <>
+              <header className="result-card__header">
+                <h2>{result.query_normalized}</h2>
+                <div className="tag-chip-row">
+                  {result.merged_vibe && <span className="tag-chip">{result.merged_vibe}</span>}
+                  {result.energy_profile && (
+                    <span className="tag-chip tag-chip--muted">{result.energy_profile}</span>
                   )}
-                </header>
-                <div className="candidate-list">
-                  {result.candidates.length === 0 && (
-                    <p className="placeholder">
-                      No live matches yet. Try widening the radius or adjusting keywords.
-                    </p>
-                  )}
+                </div>
+              </header>
+              {result.candidates.length === 0 ? (
+                <p className="placeholder">
+                  No live matches. Try widening the radius or tweaking your keywords.
+                </p>
+              ) : (
+                <ul className="result-list">
                   {result.candidates.map((card) => (
-                    <article key={card.title} className="candidate-card">
+                    <li key={card.title} className="result-list__item">
                       <div>
-                        <h3>{card.title}</h3>
-                        {card.address && <span className="candidate-card__address">{card.address}</span>}
+                        <strong>{card.title}</strong>
+                        {card.address && <span>{card.address}</span>}
                       </div>
-                      <div className="candidate-card__meta">
+                      <p>
                         {card.price ? card.price : "Price: —"} ·{" "}
                         {card.distance_km ? `${card.distance_km} km` : "distance unknown"} ·{" "}
                         <span className="source-pill">{card.source}</span>
-                      </div>
-                      {card.summary && <p className="candidate-card__summary">{card.summary}</p>}
-                      <div className="candidate-card__footer">
+                      </p>
+                      {card.summary && <p className="summary-text">{card.summary}</p>}
+                      <footer>
                         <span className="score">{Math.round(card.group_score * 100)}%</span>
                         <div className="links">
                           {card.booking_url && (
@@ -653,59 +654,62 @@ export default function App() {
                             </a>
                           )}
                         </div>
-                      </div>
-                    </article>
+                      </footer>
+                    </li>
                   ))}
-                </div>
-              </div>
-            )}
-          </div>
+                </ul>
+              )}
+            </>
+          )}
         </div>
+      </section>
 
-        <aside className="event-tray">
-          <form className="event-form" onSubmit={handleEventSearchSubmit}>
-            <input
-              value={eventQuery}
-              onChange={(e) => setEventQuery(e.target.value)}
-              placeholder="Keyword"
-            />
-            <input
-              value={eventLocation}
-              onChange={(e) => setEventLocation(e.target.value)}
-              placeholder="Location"
-            />
-            <input
-              value={eventVibeFilter}
-              onChange={(e) => setEventVibeFilter(e.target.value)}
-              placeholder="Vibe"
-            />
-            <button type="submit" disabled={eventsLoading}>
-              {eventsLoading ? "..." : "Refresh"}
-            </button>
-          </form>
+      <aside className="event-board">
+        <form className="event-board__form" onSubmit={handleEventSearchSubmit}>
+          <input
+            value={eventQuery}
+            onChange={(e) => setEventQuery(e.target.value)}
+            placeholder="Keyword"
+          />
+          <input
+            value={eventLocation}
+            onChange={(e) => setEventLocation(e.target.value)}
+            placeholder="Location"
+          />
+          <input
+            value={eventVibeFilter}
+            onChange={(e) => setEventVibeFilter(e.target.value)}
+            placeholder="Vibe"
+          />
+          <button type="submit" disabled={eventsLoading}>
+            {eventsLoading ? "..." : "Refresh"}
+          </button>
+        </form>
 
-          <div className="event-tray__list">
-            {eventsError && <div className="inline-error">{eventsError}</div>}
-            {!eventsError && eventsLoading && <p className="placeholder">Loading events...</p>}
-            {!eventsError && !eventsLoading && events.length === 0 && (
-              <p className="placeholder">No events matched. Try new keywords.</p>
-            )}
-            {events.map((event) => (
-              <button
-                key={event.id}
-                type="button"
-                className={`event-pill ${activeEventId === event.id ? "event-pill--active" : ""}`}
-                onClick={() => handleEventCardClick(event)}
-              >
-                <span className="event-pill__title">{event.title}</span>
-                <span className="event-pill__meta">
+        <div className="event-board__list">
+          {eventsError && <div className="inline-error">{eventsError}</div>}
+          {!eventsError && eventsLoading && <p className="placeholder">Loading events...</p>}
+          {!eventsError && !eventsLoading && events.length === 0 && (
+            <p className="placeholder">No events matched. Try new keywords.</p>
+          )}
+          {events.map((event) => (
+            <button
+              key={event.id}
+              type="button"
+              className={`event-card ${activeEventId === event.id ? "event-card--active" : ""}`}
+              onClick={() => handleEventCardClick(event)}
+            >
+              <div>
+                <span className="event-card__title">{event.title}</span>
+                <span className="event-card__meta">
                   {event.venue ?? event.address ?? "TBA"} · {event.price ?? "—"}
                 </span>
-              </button>
-            ))}
-          </div>
-        </aside>
-      </div>
+              </div>
+              <span className="source-pill">{event.source}</span>
+            </button>
+          ))}
+        </div>
+      </aside>
     </div>
   );
 }
