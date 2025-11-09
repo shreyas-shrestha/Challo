@@ -389,7 +389,7 @@ export default function App() {
       </div>
 
       <header className="top-bar">
-        <span className="logo">Vivi</span>
+        <span className="logo">Challo</span>
         <div className="top-bar__meta">
           <span>Agent graph</span>
           <span>Eventbrite</span>
